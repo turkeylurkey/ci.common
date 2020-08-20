@@ -1098,8 +1098,12 @@ public abstract class DevUtil {
         String result = null;
         try {
             debug("execDocker, cmd="+command);
+            long startTime = System.currentTimeMillis();
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor(timeout, TimeUnit.SECONDS);
+            if (command.startsWith("docker build")) {
+                dockerIgnoreHelpMessage(startTime);
+            }
             if (p.exitValue() != 0) {
                 debug("Error running docker command, return value="+p.exitValue());
                 // read messages from standard err
@@ -1122,9 +1126,9 @@ public abstract class DevUtil {
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
             debug("IllegalThreadStateException, message="+e.getMessage());
+            dockerIgnoreHelpMessage(0);
             error("The docker command did not complete within the timeout period: " + timeout + " seconds. " +
                 "Use the dockerTimeout option to specify a longer period or investigate performance issues with running the docker command. ", e);
-            dockerIgnoreHelpMessage();
             throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
             // Container error, throw exception
@@ -1142,48 +1146,37 @@ public abstract class DevUtil {
 
     // Look in two likely problem areas (the Liberty binary images)
     // and generate a warning if there is too much space used.
-    void dockerIgnoreHelpMessage() {
+    static final long SOFT_TIMEOUT = 30000;
+    void dockerIgnoreHelpMessage(long startTime) {
+        if (startTime > 0 && System.currentTimeMillis() - startTime < SOFT_TIMEOUT) {
+            return; // no warning when normal operation is detected and it is not too long.
+        }
         File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
         if (dockerfileToUse.exists()) {
             File dockerContext = dockerfileToUse.getParentFile();
             debug("dockerIgnoreHelpMessage, dockerContext="+dockerContext.getAbsolutePath());
-            File mavenServer = new File(dockerContext, "target/liberty/wlp");
-            long contextSizeM = 0;
-            if (mavenServer.exists()) {
-                contextSizeM = calculateDiskUse(mavenServer);
-            }
-            File gradleServer = new File(dockerContext, "build/wlp");
-            long contextSizeG = 0;
-            if (gradleServer.exists()) {
-                contextSizeG = calculateDiskUse(gradleServer);
-            }
-            debug("  Maven server size="+contextSizeM+" Gradle server size="+contextSizeG);
-            final long TOO_BIG = 1000000;
-            if (contextSizeM + contextSizeG > TOO_BIG) {
-                warn("The docker build context contains some large files which may slow the docker build command. " + 
-                    "If the files are not needed you should add them to the .dockerIgnore file to improve docker build performance.");
-                if (contextSizeM > 100000) {
-                    warn("Directory:" + mavenServer.getAbsoluteFile() + " size:" + contextSizeM);
+            File dockerIgnore = new File(dockerContext, ".dockerignore");
+            if (!dockerIgnore.exists()) { // provide some advice
+                String serverMessage = null;
+                File mavenServer = new File(dockerContext, "target/liberty/wlp");
+                if (mavenServer.exists()) {
+                    serverMessage = "\"target/liberty/wlp\"";
                 }
-                if (contextSizeG > 100000) {
-                    warn("Directory:" + gradleServer.getAbsoluteFile() + " size:" + contextSizeG);
+                File gradleServer = new File(dockerContext, "build/wlp");
+                if (gradleServer.exists()) {
+                    if (serverMessage == null) {
+                        serverMessage = "\"build/wlp\"";
+                    } else {
+                        serverMessage += " and \"build/wlp\"";
+                    }
                 }
+                String warnMessage = "The docker build command is slower than expected. You may increase performance " + 
+                    "by adding unneeded files and directories to the .dockerignore file.";
+                if (serverMessage != null) {
+                    warnMessage += " We suggest adding " + serverMessage + ".";
+                }
+                warn(warnMessage);
             }
-        }
-    }
-
-    // Calculate the space used in a directory
-    long calculateDiskUse(File file) {
-        if (file.isFile()) {
-            return file.length();
-        } else if (file.isDirectory()) {
-            long length = 0;
-            for (File member : file.listFiles()) {
-                length += calculateDiskUse(member);
-            }
-            return length;
-        } else {
-            return 0;
         }
     }
 
