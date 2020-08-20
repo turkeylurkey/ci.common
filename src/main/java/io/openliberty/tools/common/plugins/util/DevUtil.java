@@ -941,7 +941,7 @@ public abstract class DevUtil {
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
             //TODO: Figure out a good timeout value for docker build
-            String buildOutput = execDockerCmd(buildCmd, 60);
+            String buildOutput = execDockerCmd(buildCmd, 1);
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
@@ -1124,6 +1124,7 @@ public abstract class DevUtil {
             debug("IllegalThreadStateException, message="+e.getMessage());
             error("The docker command did not complete within the timeout period: " + timeout + " seconds. " +
                 "Use the dockerTimeout option to specify a longer period or investigate performance issues with running the docker command. ", e);
+            dockerIgnoreHelpMessage();
             throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
             // Container error, throw exception
@@ -1137,6 +1138,53 @@ public abstract class DevUtil {
             throw new RuntimeException(e.getMessage());
         }
         return result;
+    }
+
+    // Look in two likely problem areas (the Liberty binary images)
+    // and generate a warning if there is too much space used.
+    void dockerIgnoreHelpMessage() {
+        File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
+        if (dockerfileToUse.exists()) {
+            File dockerContext = dockerfileToUse.getParentFile();
+            debug("dockerIgnoreHelpMessage, dockerContext="+dockerContext.getAbsolutePath());
+            File mavenServer = new File(dockerContext, "target/liberty/wlp");
+            long contextSizeM = 0;
+            if (mavenServer.exists()) {
+                contextSizeM = calculateDiskUse(mavenServer);
+            }
+            File gradleServer = new File(dockerContext, "build/wlp");
+            long contextSizeG = 0;
+            if (gradleServer.exists()) {
+                contextSizeG = calculateDiskUse(gradleServer);
+            }
+            debug("  Maven server size="+contextSizeM+" Gradle server size="+contextSizeG);
+            final long TOO_BIG = 1000000;
+            if (contextSizeM + contextSizeG > TOO_BIG) {
+                warn("The docker build context contains some large files which may slow the docker build command. " + 
+                    "If the files are not needed you should add them to the .dockerIgnore file to improve docker build performance.");
+                if (contextSizeM > 100000) {
+                    warn("Directory:" + mavenServer.getAbsoluteFile() + " size:" + contextSizeM);
+                }
+                if (contextSizeG > 100000) {
+                    warn("Directory:" + gradleServer.getAbsoluteFile() + " size:" + contextSizeG);
+                }
+            }
+        }
+    }
+
+    // Calculate the space used in a directory
+    long calculateDiskUse(File file) {
+        if (file.isFile()) {
+            return file.length();
+        } else if (file.isDirectory()) {
+            long length = 0;
+            for (File member : file.listFiles()) {
+                length += calculateDiskUse(member);
+            }
+            return length;
+        } else {
+            return 0;
+        }
     }
 
     /**
