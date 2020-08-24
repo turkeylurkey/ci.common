@@ -1101,9 +1101,6 @@ public abstract class DevUtil {
             long startTime = System.currentTimeMillis();
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor(timeout, TimeUnit.SECONDS);
-            if (command.startsWith("docker build")) {
-                dockerIgnoreHelpMessage(startTime);
-            }
             if (p.exitValue() != 0) {
                 debug("Error running docker command, return value="+p.exitValue());
                 // read messages from standard err
@@ -1111,6 +1108,9 @@ public abstract class DevUtil {
                 new InputStreamReader(p.getErrorStream()).read(d);
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
                 throw new RuntimeException(errorMessage);
+            }
+            if (command.startsWith("docker build")) {
+                dockerIgnoreHelpMessage(startTime);
             }
 
             // Read all the output on stdout and return it to the caller
