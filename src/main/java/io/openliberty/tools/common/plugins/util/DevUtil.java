@@ -1144,11 +1144,11 @@ public abstract class DevUtil {
         return result;
     }
 
-    // Look in two likely problem areas (the Liberty binary images)
-    // and generate a warning if there is too much space used.
-    static final long SOFT_TIMEOUT = 30000;
+    // Suggest a performance improvement if docker build takes too long.
+    static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
     void dockerIgnoreHelpMessage(long startTime) {
-        if (startTime > 0 && System.currentTimeMillis() - startTime < SOFT_TIMEOUT) {
+        // startTime == 0 indicates the hard timeout expired.
+        if (startTime > 0 && System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
             return; // no warning when normal operation is detected and it is not too long.
         }
         File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
@@ -1157,25 +1157,8 @@ public abstract class DevUtil {
             debug("dockerIgnoreHelpMessage, dockerContext="+dockerContext.getAbsolutePath());
             File dockerIgnore = new File(dockerContext, ".dockerignore");
             if (!dockerIgnore.exists()) { // provide some advice
-                String serverMessage = null;
-                File mavenServer = new File(dockerContext, "target/liberty/wlp");
-                if (mavenServer.exists()) {
-                    serverMessage = "\"target/liberty/wlp\"";
-                }
-                File gradleServer = new File(dockerContext, "build/wlp");
-                if (gradleServer.exists()) {
-                    if (serverMessage == null) {
-                        serverMessage = "\"build/wlp\"";
-                    } else {
-                        serverMessage += " and \"build/wlp\"";
-                    }
-                }
-                String warnMessage = "The docker build command is slower than expected. You may increase performance " + 
-                    "by adding unneeded files and directories to the .dockerignore file.";
-                if (serverMessage != null) {
-                    warnMessage += " We suggest adding " + serverMessage + ".";
-                }
-                warn(warnMessage);
+                warn("The docker build command is slower than expected. You may increase performance by adding " + 
+                    "unneeded files and directories such as any Liberty runtime directories to the .dockerignore file.");
             }
         }
     }
