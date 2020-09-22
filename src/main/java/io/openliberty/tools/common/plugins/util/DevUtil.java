@@ -1005,6 +1005,15 @@ public abstract class DevUtil {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
+        } catch (RuntimeException r) {
+            // remove container in case of an error trying to run the container
+            String containerId = getContainerId();
+            if (containerId != null && !containerId.isEmpty()) {
+                String dockerRmCmd = "docker container rm " + containerId;
+                debug("docker container rm command: " + dockerRmCmd);
+                execDockerCmd(dockerRmCmd, 10);
+            }
+            throw r;
         }
     }
 
@@ -1073,12 +1082,9 @@ public abstract class DevUtil {
 
     private void stopContainer() {
         try {
-            info("Stopping container...");
             if (dockerRunProcess != null) {
-                String dockerPsCmd = "docker ps -qf name=" + DEVMODE_CONTAINER_NAME;
-                debug("docker ps command: " + dockerPsCmd);
-                String containerId = execDockerCmd(dockerPsCmd, 10);
-
+                info("Stopping container...");
+                String containerId = getContainerId();
                 String dockerStopCmd = "docker stop " + containerId;
                 debug("docker stop command: " + dockerStopCmd);
                 execDockerCmd(dockerStopCmd, 30);
@@ -1091,6 +1097,12 @@ public abstract class DevUtil {
         }
     }
 
+    private String getContainerId() {
+        // -q = quiet, only id number, -a = include stopped containers, -f = filter by key=value. -f must be last
+        String dockerPsCmd = "docker ps -aqf name=" + DEVMODE_CONTAINER_NAME;
+        debug("docker ps command: " + dockerPsCmd);
+        return execDockerCmd(dockerPsCmd, 10);
+    }
     /**
      * @param timeout unit is seconds
      * @return the stdout of the command or null for no output on stdout
