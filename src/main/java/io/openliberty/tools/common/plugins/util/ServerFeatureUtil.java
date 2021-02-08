@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2020.
+ * (C) Copyright IBM Corporation 2019, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package io.openliberty.tools.common.plugins.util;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
+import java.io.InputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -35,6 +36,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.JsonValue;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -512,5 +518,60 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         returnValue = returnValue.replace("\\","/");
         debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
         return returnValue;
+    }
+
+    private static Set<String> allServerFeatures = null;
+    private static String allServerFeaturesV = null;
+    private static String LIBERTY_FEATURE_PUBLIC = "PUBLIC";
+    public Set<String> getAllServerFeatures(String serverVersion) {
+        if (allServerFeaturesV != null && !allServerFeaturesV.equals(serverVersion)) {
+            allServerFeatures = null; // new version, reload
+            allServerFeaturesV = null;
+        }
+        if (allServerFeatures == null) {
+            warn("build list");
+            long startTime = System.currentTimeMillis();
+            Set<String> newServerFeatures = new HashSet<String>();
+            String baseURL = "https://repo1.maven.org/maven2/io/openliberty/features/features/";
+            JsonReader jsonReader = null;
+            try {
+                URL featureURL = new URL(baseURL+serverVersion+"/features-"+serverVersion+".json");
+                InputStream stream = featureURL.openStream();
+                warn("created stream");
+                jsonReader = Json.createReader(stream);
+                JsonArray featureList = jsonReader.readArray();
+                //
+                // Set<String> gids = new HashSet<String>();
+                //
+                warn("read array");
+                for (JsonValue feature : featureList) {
+                    JsonObject wlpInfo = ((JsonObject)feature).getJsonObject("wlpInformation");
+                    String visible = wlpInfo.getString("visibility");
+                    warn("visible="+visible);
+                    //
+                    // String mavenCoords = wlpInfo.getString("mavenCoordinates");
+                    // String groupid = mavenCoords.substring(0,mavenCoords.indexOf(":"));
+                    // gids.add(groupid);
+                    //
+                    if (LIBERTY_FEATURE_PUBLIC.equals(visible)) {
+                        String featureName = wlpInfo.getString("shortName");
+                        warn("adding public feature:"+featureName);
+                        newServerFeatures.add(featureName);
+                    }
+                }
+                // warn("All groupids:"+gids);
+            } catch (IOException x) {
+                debug("Unable to read Liberty server features", x);
+            } finally {
+                if (jsonReader != null) {
+                    jsonReader.close();
+                }
+            }
+            allServerFeatures = newServerFeatures;
+            allServerFeaturesV = serverVersion;
+            warn("Elapsed time="+(System.currentTimeMillis()-startTime)/1000.0+" seconds");
+        }
+        warn("return list");
+        return allServerFeatures;
     }
 }
