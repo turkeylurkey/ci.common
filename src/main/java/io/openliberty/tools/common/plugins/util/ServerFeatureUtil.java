@@ -523,7 +523,9 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     private static Set<String> allServerFeatures = null;
     private static String allServerFeaturesV = null;
     private static String LIBERTY_FEATURE_PUBLIC = "PUBLIC";
-    public Set<String> getAllServerFeatures(String serverVersion) {
+    private static int SELECT_SERVER_LIBERTY = 0;
+    private static int SELECT_SERVER_WEBSPHERE = 1;
+    public Set<String> getAllServerFeatures(int selectServer, String serverVersion) {
         if (allServerFeaturesV != null && !allServerFeaturesV.equals(serverVersion)) {
             allServerFeatures = null; // new version, reload
             allServerFeaturesV = null;
@@ -532,7 +534,14 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
             warn("build list");
             long startTime = System.currentTimeMillis();
             Set<String> newServerFeatures = new HashSet<String>();
-            String baseURL = "https://repo1.maven.org/maven2/io/openliberty/features/features/";
+            String baseURL;
+            if (selectServer == SELECT_SERVER_LIBERTY) {
+                baseURL = "https://repo1.maven.org/maven2/io/openliberty/features/features/";
+            } else if (selectServer == SELECT_SERVER_WEBSPHERE) {
+                baseURL = "https://repo1.maven.org/maven2/com/ibm/websphere/appserver/features/features/";
+            } else {
+                baseURL = "https://repo1.maven.org/maven2/io/openliberty/features/features/";
+            }
             JsonReader jsonReader = null;
             try {
                 URL featureURL = new URL(baseURL+serverVersion+"/features-"+serverVersion+".json");
@@ -545,18 +554,43 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
                 //
                 warn("read array");
                 for (JsonValue feature : featureList) {
-                    JsonObject wlpInfo = ((JsonObject)feature).getJsonObject("wlpInformation");
-                    String visible = wlpInfo.getString("visibility");
-                    warn("visible="+visible);
-                    //
-                    // String mavenCoords = wlpInfo.getString("mavenCoordinates");
-                    // String groupid = mavenCoords.substring(0,mavenCoords.indexOf(":"));
-                    // gids.add(groupid);
-                    //
-                    if (LIBERTY_FEATURE_PUBLIC.equals(visible)) {
-                        String featureName = wlpInfo.getString("shortName");
-                        warn("adding public feature:"+featureName);
-                        newServerFeatures.add(featureName);
+                    int progress = 0;
+                    try {
+                        JsonObject wlpInfo = ((JsonObject)feature).getJsonObject("wlpInformation");
+                        progress = 1;
+                        // String name = ((JsonObject)feature).getString("name");
+                        // warn("Examining:"+name);
+                        String visible =  wlpInfo.getString("visibility");
+                        progress = 2;
+                        //
+                        // String mavenCoords = wlpInfo.getString("mavenCoordinates");
+                        // String groupid = mavenCoords.substring(0,mavenCoords.indexOf(":"));
+                        // gids.add(groupid);
+                        //
+                        if (LIBERTY_FEATURE_PUBLIC.equals(visible)) {
+                            progress = 3;
+                            String featureName = wlpInfo.getString("shortName");
+                            progress = 4;
+                            warn("adding public feature:"+featureName+" dependencies: n/a");
+                            //
+                            // print dependencies that are not liberty or websphere
+                            // JsonArray requires = wlpInfo.getJsonArray("requireFeature");
+                            // if (requires != null) {
+                            //     for (int i=0; i < requires.size(); i++) {
+                            //         String dep = requires.getString(i);
+                            //         if (dep != null && 
+                            //             !dep.startsWith("io.openliberty") && 
+                            //             !dep.startsWith("com.ibm.websphere") &&
+                            //             !dep.startsWith("com.ibm.ws")) {
+                            //             warn("-"+dep);
+                            //         }
+                            //     }
+                            // }
+                            //
+                            newServerFeatures.add(featureName);
+                        }
+                    } catch (NullPointerException n) {
+                        warn("NPE getting one of the fields:"+progress);
                     }
                 }
                 // warn("All groupids:"+gids);
