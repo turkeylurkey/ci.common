@@ -57,7 +57,7 @@ public class ServerConfigDropinXmlDocument extends XmlDocument {
         child.setAttribute(valueAttr, varValue);
         elem.appendChild(child);
     }
-      
+
     public void createFeature(String name) {
         if (featureManager == null) {
             featureManager = doc.createElement("featureManager");
@@ -67,5 +67,5 @@ public class ServerConfigDropinXmlDocument extends XmlDocument {
         Node text = doc.createTextNode(name);
         child.appendChild(text);
         featureManager.appendChild(child);
-    }  
+    }
 }
