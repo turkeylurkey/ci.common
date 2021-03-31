@@ -48,31 +48,38 @@ public class LooseConfigData extends XmlDocument {
     public LooseConfigData() throws ParserConfigurationException {
         createDocument("archive");
     }
-    
-    public void addDir(File src, String target) throws DOMException, IOException {
+
+    public void toXmlFile(File xmlFile) throws Exception {
+        writeXMLDocument(xmlFile);
+    }
+
+    public Element addDir(File src, String target) throws DOMException, IOException {
         if (src != null && src.exists() && src.isDirectory()) {
-            addDir(doc.getDocumentElement(), src, target);
+            return addDir(doc.getDocumentElement(), src, target);
         }
+        return null;
     }
     
-    public void addDir(Element parent, File src, String target) throws DOMException, IOException {
+    public Element addDir(Element parent, File src, String target) throws DOMException, IOException {
         if (src != null && src.exists() && src.isDirectory()) {
             Element child = doc.createElement("dir");
-            addElement(parent, child, src, target);
+            return addElement(parent, child, src, target);
         }
+        return null;
     }
     
-    public void addFile(File src, String target) throws DOMException, IOException {
+    public Element addFile(File src, String target) throws DOMException, IOException {
         if (src != null && src.exists() && src.isFile()) {
-            addFile(doc.getDocumentElement(), src, target);
+            return addFile(doc.getDocumentElement(), src, target);
         }
+        return null;
     }
     
-    public void addFile(Element parent, File src, String target) throws DOMException, IOException {
-        addFile(parent, src, target, null);
+    public Element addFile(Element parent, File src, String target) throws DOMException, IOException {
+        return addFile(parent, src, target, null);
     }
     
-    public void addFile(Element parent, File src, String target, File copyDirectory) throws DOMException, IOException {
+    public Element addFile(Element parent, File src, String target, File copyDirectory) throws DOMException, IOException {
         if (src != null && src.exists() && src.isFile()) {
             Element child = doc.createElement("file");
             if(copyDirectory != null && copyDirectory.exists() && copyDirectory.isDirectory() &&
@@ -85,12 +92,13 @@ public class LooseConfigData extends XmlDocument {
                 File copyFile = new File(copyFileDirectory, src.getName());
                 FileUtils.copyFile(src, copyFile);
                 
-                addElement(parent, child, copyFile, target);
+                return addElement(parent, child, copyFile, target);
             }
             else {
-                addElement(parent, child, src, target);
+                return addElement(parent, child, src, target);
             }
         }
+        return null;
     }
     
     public Element addArchive(String target) {
@@ -98,36 +106,34 @@ public class LooseConfigData extends XmlDocument {
     }
     
     public Element addArchive(Element parent, String target) {
-        Element child = doc.createElement("archive");
-        addElement(parent, child, target);
-        return child;
+        Element newArchive = doc.createElement("archive");
+        addElement(parent, newArchive, target);
+        return newArchive;
     }
     
-    public void addArchive(File src, String target) throws DOMException, IOException {
-        Element child = addArchive(target);
-        addElement(child, doc.createElement("dir"), src, "/");
-    }
-    
-    public void toXmlFile(File xmlFile) throws Exception {        
-        writeXMLDocument(xmlFile);
+    public Element addArchive(File dir, String target) throws DOMException, IOException {
+        Element newArchive = addArchive(target);
+        addElement(newArchive, doc.createElement("dir"), dir, "/");
+        return newArchive;
     }
     
     public Element getDocumentRoot() {
         return doc.getDocumentElement();
     }
     
-    private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
+    private Element addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
         String name = src.getCanonicalPath();
         if (sourceOnDiskName != null && projectRoot != null && name.startsWith(projectRoot)) {
             child.setAttribute("sourceOnDisk", sourceOnDiskName + name.substring(projectRoot.length()));
         } else {
             child.setAttribute("sourceOnDisk", src.getCanonicalPath());
         }
-        addElement(parent, child, target);
+        return addElement(parent, child, target);
     }
     
-    private void addElement(Element parent, Element child, String target) {
+    private Element addElement(Element parent, Element child, String target) {
         child.setAttribute("targetInArchive", target);
         parent.appendChild(child);
+        return child;
     }
 }
