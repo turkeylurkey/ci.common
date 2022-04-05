@@ -2526,6 +2526,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey r = new HotKey("r");
             HotKey g = new HotKey("g");
             HotKey o = new HotKey("o");
+            HotKey enter = new HotKey("");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
@@ -2561,7 +2562,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
                         }
-                    } else {
+                    } else if (enter.isPressed(line))  {
+                        info("Enter is pressed");
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
@@ -2569,6 +2571,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         } else {
                             runTestThread(false, executor, -1, true, buildFile);
                         }
+                    } else {
+                        // simply echo input. Useful in integration tests
+                        info(line);
                     }
                 }
             } else {
