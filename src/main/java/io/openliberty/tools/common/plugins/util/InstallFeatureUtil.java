@@ -627,7 +627,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     @SuppressWarnings("unchecked")
     public void installFeatures(boolean isAcceptLicense, List<String> featuresList)
             throws PluginExecutionException {
-    	
+        info("Installing features: featuresList: " + featuresList);
     	Map<String, String> featureToExtMap = new HashMap<String, String>();
     	List<String> featuresToInstall = new ArrayList<String>();
     	
