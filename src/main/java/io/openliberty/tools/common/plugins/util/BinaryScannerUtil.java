@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2021, 2022.
+ * (C) Copyright IBM Corporation 2021, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 package io.openliberty.tools.common.plugins.util;
+
+import com.ibm.websphere.binary.cmdline.BinaryScanner;
+import com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException;
+import com.ibm.websphere.binary.cmdline.exceptions.FeatureNotAvailableAtRequestedLevelException;
+import com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException;
+import com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException;
+import com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetCombinationException;
+import com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetException;
 
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
@@ -128,7 +136,7 @@ public abstract class BinaryScannerUtil {
             // we do not need to rerun the binary scanner if it fails
             boolean reRunIfFailed = !currentFeatureSet.isEmpty() || !optimize;
             try {
-                Method generateFeatureSetMethod = getScannerMethod();
+                //Method generateFeatureSetMethod = getScannerMethod();
                 // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
                 Set<String> binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
                 String logLevel;
@@ -146,9 +154,64 @@ public abstract class BinaryScannerUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
-                featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
-                        currentFeatureSet, logLocation, logLevel, java.util.Locale.getDefault());
+                featureList = BinaryScanner.generateFeatureList(binaryInputs, targetJavaEE, targetMicroProfile,
+                    currentFeatureSet, logLocation, logLevel, java.util.Locale.getDefault());
+                // featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
+                //         currentFeatureSet, logLocation, logLevel, java.util.Locale.getDefault());
                 for (String s : featureList) {debug(s);};
+            } catch (ProvidedFeatureConflictException scannerException) {
+                // The list of features from the app is passed in but it contains conflicts
+                Set<String> conflicts = scannerException.getFeatures();
+                // always rerun binary scanner in this scenario, this exception only occurs if a current feature list is passed to binary scanner
+                Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
+                if (sampleFeatureList == null) {
+                    throw new NoRecommendationException(conflicts);
+                } else {
+                    throw new RecommendationSetException(true, conflicts, sampleFeatureList);
+                }
+            } catch (FeatureConflictException scannerException) {
+                // The scanned files conflict with each other or with current features
+                Set<String> conflicts = scannerException.getFeatures();
+                //  rerun binary scanner with all class files and without the current feature set to get feature recommendations
+                Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile): null;
+                if (sampleFeatureList == null) {
+                    throw new NoRecommendationException(conflicts);
+                } else {
+                    throw new RecommendationSetException(false, conflicts, sampleFeatureList);
+                }
+            } catch (RequiredFeatureModifiedException scannerException) {
+                // The scanned files conflict and the scanner suggests modifying some features
+                Set<String> modifications = scannerException.getFeatures();
+                //  rerun binary scanner with all class files and without the current feature set
+                Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile) : null;
+                throw new FeatureModifiedException(modifications, 
+                        (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, scannerException.getLocalizedMessage());
+            } catch (FeatureNotAvailableAtRequestedLevelException scannerException) {
+                // The list of features required by app or passed to binary scanner do not exist
+                // at the required EE or MP level
+                Set<String> conflicts = scannerException.getFeatures();
+                Set<String> unavailableFeatures = scannerException.getUnavailableEEFeatures();
+                unavailableFeatures.addAll(scannerException.getUnavailableMPFeatures());
+                throw new FeatureUnavailableException(conflicts, unavailableFeatures, targetMicroProfile,
+                        targetJavaEE);
+            } catch (IllegalTargetException scannerException) {
+                // The EE and/or the MP version number is out of range
+                throw new IllegalTargetException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
+            } catch (IllegalTargetCombinationException scannerException) {
+                // The EE and MP version numbers are in range but they are not compatible with each other based on the standards.
+                throw new IllegalTargetComboException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
+            } catch (IllegalArgumentException scannerException) {
+                // Used by binary scanner 22.0.0.3, remove after 22.0.0.4 is in sonatype
+                // TODO: Affected by issue #1558
+                String msg = scannerException.getMessage();
+                if (msg.contains("CWMIG12056E")) {
+                    if (msg.contains("targetJavaEE")) {
+                        throw new PluginExecutionException(BINARY_SCANNER_INVALID_EE_MESSAGE);
+                    } else if (msg.contains("targetMicroProfile")) {
+                        throw new PluginExecutionException(BINARY_SCANNER_INVALID_MP_MESSAGE);
+                    }
+                }
+                // otherwise exit this if statement and execute default behaviour.
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
                 // called through reflection. We must extract the actual exception from the 'cause' field.
