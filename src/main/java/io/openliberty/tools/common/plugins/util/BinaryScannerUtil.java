@@ -23,12 +23,6 @@ import com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedExcept
 import com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetCombinationException;
 import com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetException;
 
-import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,12 +36,6 @@ public abstract class BinaryScannerUtil {
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_FILE_PATH = "configDropins/overrides/" + GENERATED_FEATURES_FILE_NAME;
-    private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
-    private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
-    private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
-    private static final String FEATURE_NOT_AVAILABLE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureNotAvailableAtRequestedLevelException";
-    private static final String ILLEGAL_TARGET_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetException";
-    private static final String ILLEGAL_TARGET_COMBINATION_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetCombinationException";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
@@ -278,36 +266,6 @@ public abstract class BinaryScannerUtil {
         return sampleFeatureList;
     }
 
-    private ClassLoader getScannerClassLoader() throws MalformedURLException {
-        if (binaryScannerClassLoader == null) {
-            ClassLoader cl = this.getClass().getClassLoader();
-            binaryScannerClassLoader = new URLClassLoader(new URL[] { binaryScanner.toURI().toURL() }, cl);
-        }
-        return binaryScannerClassLoader;
-    }
-
-    private Class getScannerClass() throws MalformedURLException, ClassNotFoundException {
-        if (binaryScannerClass == null) {
-            ClassLoader cl = getScannerClassLoader();
-            binaryScannerClass = cl.loadClass("com.ibm.websphere.binary.cmdline.BinaryScanner");
-        }
-        return binaryScannerClass;
-    }
-
-    private Method getScannerMethod() throws MalformedURLException, ClassNotFoundException, NoSuchMethodException, PluginExecutionException, SecurityException {
-        if (binaryScannerMethod == null) {
-            Class driveScan = getScannerClass();
-            // args: Set<String>, String, String, Set<String>, String, String, Locale
-            // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
-            binaryScannerMethod = driveScan.getMethod("generateFeatureList", Set.class, String.class, String.class,
-                    Set.class, String.class, String.class, java.util.Locale.class);
-            if (binaryScannerMethod == null) {
-                throw new PluginExecutionException("Error finding binary scanner method using reflection");
-            }
-        }
-        return binaryScannerMethod;
-    }
-
     private static Set<String> getBinaryInputs(List<String> classFiles, Set<String> classDirectories, boolean optimize) throws PluginExecutionException {
         Set<String> resultSet;
         if (optimize) {
@@ -323,52 +281,6 @@ public abstract class BinaryScannerUtil {
             }
         }
         return resultSet;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Set<String> getFeatures(Throwable scannerResponse) {
-        return (Set<String>) getMethodResult(scannerResponse, "getFeatures");
-    }
-
-    @SuppressWarnings("unchecked")
-    private Set<String> getUnavailableMPFeatures(Throwable scannerResponse) {
-        return (Set<String>) getMethodResult(scannerResponse, "getUnavailableMPFeatures");
-    }
-    @SuppressWarnings("unchecked")
-    private Set<String> getUnavailableEEFeatures(Throwable scannerResponse) {
-        return (Set<String>) getMethodResult(scannerResponse, "getUnavailableEEFeatures");
-    }
-
-    @SuppressWarnings("unchecked")
-    private String getInvalidMPTarget(Throwable scannerResponse) {
-        return (String) getMethodResult(scannerResponse, "getIllegalMPTarget");
-    }
-    @SuppressWarnings("unchecked")
-    private String getInvalidEETarget(Throwable scannerResponse) {
-        return (String) getMethodResult(scannerResponse, "getIllegalEETarget");
-    }
-
-    @SuppressWarnings("unchecked")
-    private Object getMethodResult(Throwable scannerResponse, String method) {
-        try {
-            ClassLoader cl = getScannerClassLoader();
-            @SuppressWarnings("rawtypes")
-            Class featureConflictException = cl.loadClass(scannerResponse.getClass().getName());
-            Method featureMethod = featureConflictException.getMethod(method);
-            if (featureMethod == null) {
-                debug("Error finding " + scannerResponse.getClass().getName() + " method " + method + " using reflection");
-                return null;
-            }
-            return featureMethod.invoke(scannerResponse);
-        } catch (ClassNotFoundException | MalformedURLException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException x) {
-            debug("An error occurred when trying to call the binary scanner jar " + method + ":"+x.getClass().getName(), x);
-            Throwable cause = x.getCause();
-            if (cause != null) {
-                debug("Caused by exception:"+cause.getClass().getName());
-                debug("Caused by exception message:" + cause.getMessage());
-            }
-        }
-        return null;
     }
 
     /**
