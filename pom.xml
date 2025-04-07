@@ -66,5 +66,11 @@
             <artifactId>jackson-core</artifactId>
             <version>2.15.2</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.ibm.websphere.appmod.tools/binary-app-scanner -->
+        <dependency>
+            <groupId>com.ibm.websphere.appmod.tools</groupId>
+            <artifactId>binary-app-scanner</artifactId>
+            <version>24.0.0.2</version>
+        </dependency>
     </dependencies>
 </project>
