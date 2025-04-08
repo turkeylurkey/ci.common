@@ -29,11 +29,6 @@ import java.util.Set;
 
 public abstract class BinaryScannerUtil {
 
-    public static final String BINARY_SCANNER_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
-    public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
-    public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
-    public static final String BINARY_SCANNER_MAVEN_VERSION = "[21.0.0.5-SNAPSHOT,)";
-
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_FILE_PATH = "configDropins/overrides/" + GENERATED_FEATURES_FILE_NAME;
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
