@@ -125,6 +125,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String DEVMODE_IMAGE_SUFFIX = "-dev-mode";
     public static final String SKIP_BETA_INSTALL_WARNING = "skipBetaInstallFeatureWarning";
     public static final String DEVC_HIDDEN_FOLDER = ".libertyDevc";
+    public static final String GENERATE_HIDDEN_FOLDER = ".libertyGenerate";
 
     private static final String[] IGNORE_DIRECTORY_PREFIXES = new String[] { "." };
     private static final String[] IGNORE_FILE_PREFIXES = new String[] { "." };
@@ -1285,11 +1286,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         File tempContainerfile = null;
         try {
-            debug("Creating temp Containerfile...");
-            File devcHiddenFolder = new File(buildDirectory, DEVC_HIDDEN_FOLDER);
-            devcHiddenFolder.mkdirs();
-            tempContainerfile = File.createTempFile("tempContainerfile", "", devcHiddenFolder);
-            debug("temp Containerfile: " + tempContainerfile);
+            tempContainerfile = createTempFile(DEVC_HIDDEN_FOLDER, "tempContainerfile", "");
             tempContainerfilePath = tempContainerfile.toPath(); // save name to clean up later
             if (keepTempContainerfile) {
                 info("Keeping temporary Containerfile: "+tempContainerfilePath);
@@ -1304,6 +1301,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         return tempContainerfile;
     }
+
+    private File createTempFile(String dirName, String baseName, String ext) throws IOException {
+        debug("Creating temp file " + baseName);
+        File hiddenFolder = new File(buildDirectory, dirName);
+        hiddenFolder.mkdirs();
+        File tempFile = File.createTempFile(baseName, ext, hiddenFolder);
+        debug("created temp file: " + tempFile);
+        return tempFile;
+     }
 
     private void buildContainerImage(File tempContainerfile, File userContainerfile, boolean pullParentImage, File buildContext) throws PluginExecutionException {
         info("Building container image...");
