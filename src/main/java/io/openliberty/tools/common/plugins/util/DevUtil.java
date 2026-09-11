@@ -4159,6 +4159,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         warn ("triggerJavaSourceRecompile="+triggerJavaSourceRecompile);
                         warn ("generateFeatures="+generateFeatures);
                         warn ("outputDirectory="+outputDirectory);
+                        // If the recompile was triggered by a pom.xml fix then the output directory may never
+                        // have been registered with the file watcher (it was empty when the initial compile
+                        // on start up failed), so class file events will not fire to populate
+                        // modifiedClasses. Add the output directory explicitly so generate features runs.
+                        if (triggerJavaSourceRecompile && generateFeatures && outputDirectory != null) {
+                            warn ("Adding to modifiedClasses:  outputDirectory");
+                            modifiedClasses.add(outputDirectory);
+                        }
                     }
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
@@ -4698,6 +4706,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!failedCompilationJavaSources.isEmpty()) {
                         warn ("app src recompile bit");
                         triggerJavaSourceRecompile = true;
+                        modifiedSrcBuildFile = buildFile;
                     }
                     // trigger java test recompile if there are compilation errors
                     if (!failedCompilationJavaTests.isEmpty()) {
