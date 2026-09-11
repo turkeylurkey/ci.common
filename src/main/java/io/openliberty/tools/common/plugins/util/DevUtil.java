@@ -4164,7 +4164,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // on start up failed), so class file events will not fire to populate
                         // modifiedClasses. Add the output directory explicitly so generate features runs.
                         if (triggerJavaSourceRecompile && generateFeatures && outputDirectory != null) {
-                            warn ("Adding to modifiedClasses:  outputDirectory");
                             modifiedClasses.add(outputDirectory);
                         }
                     }
