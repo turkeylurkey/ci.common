@@ -3239,6 +3239,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (this.outputDirectory.exists() && this.outputDirectory.list().length > 0) {
                             debug("Registering class output directory: " + this.outputDirectory);
                             warn ("Registering class output directory: " + this.outputDirectory);
+                            warn ("generateFeatures: " + generateFeatures + " classesFailingToCompile()="+classesFailingToCompile()+" modifiedClasses.isEmpty()="+modifiedClasses.isEmpty());
                             registerAll(outputPath, executor);
                             sourceOutputDirRegistered = true;
                         }
@@ -4099,7 +4100,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
             Set<String> compileArtifactPaths, Set<String> testArtifactPaths, String projectName, boolean upstreamBuilt) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
-        warn ("processJavaCompilation");
+        // warn ("processJavaCompilation");
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
         boolean pastBuildFileWaitPeriod = true;
@@ -4122,7 +4123,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                 }
             }
-            warn ("triggerJavaSourceRecompile="+triggerJavaSourceRecompile);
+            // warn ("triggerJavaSourceRecompile="+triggerJavaSourceRecompile);
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
                 numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 // try to recompile java files that previously did not compile successfully
@@ -4143,16 +4144,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
                 debug("Recompiling Java source files: " + recompileJavaSources);
-                warn ("Recompiling Java source files: " + recompileJavaSources);
+                warn ("2 Recompiling Java source files: " + recompileJavaSources); // how do we get to generate-features from here
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
+                    warn ("successful compilation so we can clear failedCompilation list");
                     // successful compilation so we can clear failedCompilation list
+                    warn ("modifiedSrcBuildFile="+modifiedSrcBuildFile);
                     failedCompilationJavaSources.clear();
                     if (modifiedSrcBuildFile != null && modifiedSrcBuildFile.equals(buildFile)) {
                         // The module with the latest src file change has compiled successfully
                         debug("Setting lastChangeCompiled to true");
                         warn ("Setting lastChangeCompiled to true");
                         lastChangeCompiled = true;
+                        warn ("triggerJavaSourceRecompile="+triggerJavaSourceRecompile);
+                        warn ("generateFeatures="+generateFeatures);
+                        warn ("outputDirectory="+outputDirectory);
                     }
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
@@ -4189,6 +4195,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     }
                     debug("Recompiling Java test files: " + recompileJavaTests);
+                    warn ("Recompiling Java test files: " + recompileJavaTests);
                     if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
                             testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                         // successful compilation so we can clear failedCompilation list
@@ -4338,6 +4345,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         warn ("====   upstream proj: !recompileDependencies && generateFeatures && directory.startsWith(project.getOutputDirectory().getCanonicalPath()) " );
         warn ("====     !recompileDependencies=" + !recompileDependencies + ", generateFeatures = " + generateFeatures);
         warn ("====     fileChanged.getName().endsWith(.class) = " + fileChanged.getName().endsWith(".class"));
+        warn ("====     fileChanged.getName() = " + fileChanged.getName());
         warn ("====   dev mode proj: !recompileDependencies && generateFeatures && directory.startsWith(outputPath)");
         warn ("====      directory.startsWith(outputPath) = " +  directory.startsWith(outputPath)    );
 
@@ -4452,7 +4460,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 File outputDir = modifiedModule.getOutputDirectory();
                                 // Add output dir for processing generate features
                                 if (outputDir != null) {
-                                    warn ("adding to modifiedClasses");
+                                    warn ("...adding to modifiedClasses");
                                     modifiedClasses.add(outputDir);
                                 }
                                 // New src file change, reset lastChangeCompiled
@@ -4576,7 +4584,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Single module - setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
                         // Add output dir for processing generate features
                         if (outputDirectory != null) {
-                            warn ("adding to modifiedClasses");
+                            warn ("....adding to modifiedClasses");
                             modifiedClasses.add(outputDirectory);
                         }
                         // New src file change, reset lastChangeCompiled
@@ -4584,7 +4592,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     triggerMainModuleCompile(false);
                 } else {
-                    warn (" recompileJavaSources ADD 4");
+                    warn (" !recompileDependencies, recompileJavaSources ADD 4");
                     recompileJavaSources.add(fileChanged);
                 }
             } else if (changeType == ChangeType.DELETE) {
@@ -5465,13 +5473,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             String projectName, File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
             boolean skipRunningTests) throws PluginExecutionException {
         try {
-            warn ("recompileJava, javaFilesChanged="+javaFilesChanged);
+            warn ("recompileJava, javaFilesChanged="+javaFilesChanged+" >> useBuildRecompile="+useBuildRecompile);
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
 
             if (useBuildRecompile) {
                 compileResult = compile(tests ? testSourceDirectory : sourceDirectory);
             } else {
+                warn ("build compilation objects");
                 // source root is src/main/java or src/test/java
                 File classesDir = tests ? testOutputDirectory : outputDirectory;
                 if (!classesDir.exists()) {
@@ -5489,6 +5498,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     combinedCompilerOptions.addAll(projectCompilerOptions.getOptions());
                 }
                 debug("Compiler options: " + combinedCompilerOptions);
+                warn ("Compiler options: " + combinedCompilerOptions);
 
                 List<File> outputDirs = new ArrayList<File>();
 
@@ -6051,6 +6061,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (moduleBuildFile.getCanonicalPath().equals(buildFile.getCanonicalPath())) {
             debug("recompileDependencies is set to true, recompiling the entire module for "
                     + moduleBuildFile.getCanonicalPath());
+            warn ("recompileDependencies is set to true, recompiling the entire module for "+ moduleBuildFile.getCanonicalPath());
             disableDependencyCompile = true;
             return compileAllClasses(testsOnly, executor);
         }
@@ -6058,6 +6069,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (moduleBuildFile.getCanonicalPath().equals(project.getBuildFile().getCanonicalPath())) {
                 debug("recompileDependencies is set to true, recompiling the entire module for "
                         + moduleBuildFile.getCanonicalPath());
+                warn ("recompileDependencies is set to true, recompiling the entire module for "    + moduleBuildFile.getCanonicalPath());
                 project.disableDependencyCompile = true;
                 return compileAllClasses(project, testsOnly, executor);
             }
@@ -6111,6 +6123,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             ThreadPoolExecutor executor) throws IOException, PluginExecutionException {
         boolean successfulCompilation = true;
 
+        warn ("compileAllClasses");
         // recompile source
         if (!tests && shouldIncludeSources(packagingType)) {
             if (sourceDir.exists()) {
