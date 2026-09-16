@@ -5933,7 +5933,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException
      */
     protected void triggerUpstreamModuleCompile(ProjectModule project, boolean testsOnly) throws IOException {
-        new Exception().printStackTrace();
         triggerUpstreamModuleCompile(project, testsOnly, false);
     }
 
