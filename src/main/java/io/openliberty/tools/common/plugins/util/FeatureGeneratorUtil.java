@@ -184,9 +184,19 @@ public abstract class FeatureGeneratorUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
+                warn ("Calling " + featureGenJar.getName() + " with the following inputs...\n" +
+                        "  binaryInputs: " + binaryInputs + "\n" +
+                        "  targetJavaEE: " + targetJavaEE + "\n" +
+                        "  targetMicroP: " + targetMicroProfile + "\n" +
+                        "  currentFeatures: " + currentFeatureSet + "\n" +
+                        "  featureListFileMap: " + featureListFileMap + "\n" +
+                        "  logLocation: " + logLocation + "\n" +
+                        "  logLevel: " + logLevel + "\n" +
+                        "  locale: " + java.util.Locale.getDefault());
                 generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
                 for (String s : generatedFeatureList) {debug(s);};
+                for (String s : generatedFeatureList) {warn (s);};
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
                 // called through reflection. We must extract the actual exception from the 'cause' field.
