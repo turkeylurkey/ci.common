@@ -3219,8 +3219,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     long lastJavaSourceChange;
     long lastJavaTestChange;
     Map<File, Long> lastBuildFileChange;
-    // boolean triggerJavaSourceRecompile; // TODO: analyze this variable
-    // boolean triggerJavaTestRecompile; // TODO: analyze this variable
     File outputDirectory;
     File testOutputDirectory;
     File serverXmlFile;
@@ -3235,7 +3233,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     boolean lastChangeCompiled; // tracks when the module containing the latest src file change is compiled successfully
 
     // used for multi module projects
-    // boolean triggerUpstreamJavaSourceRecompile; // TODO: analyze this variable
     boolean initialCompile;
     boolean disableDependencyCompile;
 
@@ -4052,17 +4049,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
 
         if (processSources) {
-            // if (triggerUpstreamJavaSourceRecompile) { // this is triggered from build file change
-            //     compileFailingProjects(null, false, executor);
-            //     // compile main project
-            //     if (!failedCompilationJavaSources.isEmpty()) {
-            //         triggerJavaSourceRecompile = true;
-            //     }
-            //     if (!failedCompilationJavaTests.isEmpty()) {
-            //         triggerJavaTestRecompile = true;
-            //     }
-            //     change = true;
-            // }
             for (ProjectModule project : upstreamProjects) {
                 boolean successfulCompilation = true;
                 boolean compileDownstreamSrc = false;
@@ -4229,7 +4215,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     project.disableDependencyCompile = false;
                 }
             }
-            // triggerUpstreamJavaSourceRecompile = false;
         }
         return change;
     }
@@ -4353,7 +4338,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                 }
             }
-            // if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
             if (!recompileJavaSources.isEmpty()) {
                 numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 // try to recompile java files that previously did not compile successfully
@@ -4408,7 +4392,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         deleteJavaFile(file, testOutputDirectory, this.testSourceDirectory);
                     }
                 }
-                // if (!recompileJavaTests.isEmpty() || triggerJavaTestRecompile) {
                 if (!recompileJavaTests.isEmpty()) {
                     if (!failedCompilationJavaTests.isEmpty()) {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
@@ -4448,8 +4431,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             deleteJavaSources.clear();
             recompileJavaSources.clear();
-            // triggerJavaTestRecompile = false;
-            // triggerJavaSourceRecompile = false;
 
             if (processTests) {
                 deleteJavaTests.clear();
@@ -4505,9 +4486,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         failedCompilationJavaTests = new HashSet<File>();
         lastJavaSourceChange = System.currentTimeMillis();
         lastJavaTestChange = System.currentTimeMillis();
-        // triggerJavaSourceRecompile = false;
-        // triggerJavaTestRecompile = false;
-        // triggerUpstreamJavaSourceRecompile = false;
         lastBuildFileChange = new HashMap<File, Long>();
         modifiedClasses = new HashSet<File>();
         failedToGenerateClasses = new HashSet<File>();
@@ -4628,7 +4606,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (this.parentBuildFiles.containsKey(fileChanged.getCanonicalPath())
                 && changeType == ChangeType.MODIFY) {
             debug("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths of children.");
-            warn ("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths of children. " + parentBuildFiles.get(fileChanged.getCanonicalPath()));
             updateArtifactPaths(fileChanged);
             // compile child modules
             if (recompileDependencies) {
@@ -4637,18 +4614,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isMultiModuleProject()) {
                     ProjectModule project = getFirstProjectModule(fileChanged);
                     if (project != null) {
-                                warn ("triggerUpstreamModuleCompile3");
                         triggerUpstreamModuleCompile(project, false, generateFeatures);
                     } else {
-                                warn ("triggerMainModuleCompile1");
                         triggerMainModuleCompile(false, generateFeatures);
                     }
                 } else {
-                                warn ("triggerMainModuleCompile2");
                     triggerMainModuleCompile(false, generateFeatures);
                 }
             } else {
-                                warn ("triggerMainModuleCompile4");
                 triggerMainModuleCompile(false, generateFeatures);
             }
         }
@@ -4743,12 +4716,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // recompile the entire module
                         if (!project.getSourceDirectory().exists() && !project.getTestSourceDirectory().exists()
                                 && !project.getDependentModules().isEmpty()) {
-                            warn ("triggerUpstreamModuleCompile1");
                             // parent project, trigger compile on first dependent module
                             triggerUpstreamModuleCompile(getProjectModule(project.getDependentModules().get(0)),
                                     false, generateFeatures);
                         } else {
-                            warn ("triggerUpstreamModuleCompile2, project=" + project);
                             triggerUpstreamModuleCompile(project, false, generateFeatures);
                         }
                     }
