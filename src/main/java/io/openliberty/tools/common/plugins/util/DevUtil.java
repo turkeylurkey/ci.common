@@ -236,7 +236,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                  server
      */
     public abstract boolean updateArtifactPaths(ProjectModule projectModule, boolean redeployCheck,
-            boolean generateFeatures, ThreadPoolExecutor executor) throws PluginExecutionException;
+            ThreadPoolExecutor executor) throws PluginExecutionException;
 
     /**
      * Update the compile artifact paths of any child modules of the given build
@@ -3219,8 +3219,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     long lastJavaSourceChange;
     long lastJavaTestChange;
     Map<File, Long> lastBuildFileChange;
-    boolean triggerJavaSourceRecompile; // TODO: analyze this variable
-    boolean triggerJavaTestRecompile; // TODO: analyze this variable
+    // boolean triggerJavaSourceRecompile; // TODO: analyze this variable
+    // boolean triggerJavaTestRecompile; // TODO: analyze this variable
     File outputDirectory;
     File testOutputDirectory;
     File serverXmlFile;
@@ -3235,7 +3235,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     boolean lastChangeCompiled; // tracks when the module containing the latest src file change is compiled successfully
 
     // used for multi module projects
-    boolean triggerUpstreamJavaSourceRecompile; // TODO: analyze this variable
+    // boolean triggerUpstreamJavaSourceRecompile; // TODO: analyze this variable
     boolean initialCompile;
     boolean disableDependencyCompile;
 
@@ -3313,7 +3313,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
                     // TODO: Consider whether or not we should generate features at this point
-                    updateArtifactPaths(p, false, generateFeatures, executor);
+                    updateArtifactPaths(p, false, executor);
 
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
@@ -4052,17 +4052,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
 
         if (processSources) {
-            if (triggerUpstreamJavaSourceRecompile) { // this is triggered from build file change
-                compileFailingProjects(null, false, executor);
-                // compile main project
-                if (!failedCompilationJavaSources.isEmpty()) {
-                    triggerJavaSourceRecompile = true;
-                }
-                if (!failedCompilationJavaTests.isEmpty()) {
-                    triggerJavaTestRecompile = true;
-                }
-                change = true;
-            }
+            // if (triggerUpstreamJavaSourceRecompile) { // this is triggered from build file change
+            //     compileFailingProjects(null, false, executor);
+            //     // compile main project
+            //     if (!failedCompilationJavaSources.isEmpty()) {
+            //         triggerJavaSourceRecompile = true;
+            //     }
+            //     if (!failedCompilationJavaTests.isEmpty()) {
+            //         triggerJavaTestRecompile = true;
+            //     }
+            //     change = true;
+            // }
             for (ProjectModule project : upstreamProjects) {
                 boolean successfulCompilation = true;
                 boolean compileDownstreamSrc = false;
@@ -4229,7 +4229,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     project.disableDependencyCompile = false;
                 }
             }
-            triggerUpstreamJavaSourceRecompile = false;
+            // triggerUpstreamJavaSourceRecompile = false;
         }
         return change;
     }
@@ -4353,7 +4353,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                 }
             }
-            if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+            // if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+            if (!recompileJavaSources.isEmpty()) {
                 numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
@@ -4380,13 +4381,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // The module with the latest src file change has compiled successfully
                         debug("Setting lastChangeCompiled to true");
                         lastChangeCompiled = true;
+                        // TODO: find out if this if statement is no longer needed.
                         // If the recompile was triggered by a pom.xml fix then the output directory may never
                         // have been registered with the file watcher (it was empty when the initial compile
                         // on start up failed), so class file events will not fire to populate
                         // modifiedClasses. Add the output directory explicitly so generate features runs.
-                        if (triggerJavaSourceRecompile && generateFeatures && outputDirectory != null) {
-                            modifiedClasses.add(outputDirectory);
-                        }
+                        // if (triggerJavaSourceRecompile && generateFeatures && outputDirectory != null) {
+                            // modifiedClasses.add(outputDirectory);
+                        // }
                     }
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
@@ -4406,7 +4408,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         deleteJavaFile(file, testOutputDirectory, this.testSourceDirectory);
                     }
                 }
-                if (!recompileJavaTests.isEmpty() || triggerJavaTestRecompile) {
+                // if (!recompileJavaTests.isEmpty() || triggerJavaTestRecompile) {
+                if (!recompileJavaTests.isEmpty()) {
                     if (!failedCompilationJavaTests.isEmpty()) {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
@@ -4445,8 +4448,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             deleteJavaSources.clear();
             recompileJavaSources.clear();
-            triggerJavaTestRecompile = false;
-            triggerJavaSourceRecompile = false;
+            // triggerJavaTestRecompile = false;
+            // triggerJavaSourceRecompile = false;
 
             if (processTests) {
                 deleteJavaTests.clear();
@@ -4502,9 +4505,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         failedCompilationJavaTests = new HashSet<File>();
         lastJavaSourceChange = System.currentTimeMillis();
         lastJavaTestChange = System.currentTimeMillis();
-        triggerJavaSourceRecompile = false;
-        triggerJavaTestRecompile = false;
-        triggerUpstreamJavaSourceRecompile = false;
+        // triggerJavaSourceRecompile = false;
+        // triggerJavaTestRecompile = false;
+        // triggerUpstreamJavaSourceRecompile = false;
         lastBuildFileChange = new HashMap<File, Long>();
         modifiedClasses = new HashSet<File>();
         failedToGenerateClasses = new HashSet<File>();
@@ -4619,12 +4622,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
-        // A child module inherits dependencies only if it specifies the <parent> element
-        // in its pom. If the current file appears in the list of build files which contain
-        // <parent> elements then we must propagate potential dependency changes and rebuild
+        // A child module inherits dependencies only if it specifies the <parent> element in
+        // its pom. If the current file appears in the list of parent build files then we must
+        // propagate potential dependency changes into the children modules and conditionally rebuild
         if (this.parentBuildFiles.containsKey(fileChanged.getCanonicalPath())
                 && changeType == ChangeType.MODIFY) {
-            debug("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths.");
+            debug("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths of children.");
+            warn ("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths of children. " + parentBuildFiles.get(fileChanged.getCanonicalPath()));
             updateArtifactPaths(fileChanged);
             // compile child modules
             if (recompileDependencies) {
@@ -4644,7 +4648,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     triggerMainModuleCompile(false, generateFeatures);
                 }
             } else {
-                                warn ("triggerMainModuleCompile3");
+                                warn ("triggerMainModuleCompile4");
                 triggerMainModuleCompile(false, generateFeatures);
             }
         }
@@ -4734,7 +4738,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
                     lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                     // when an upstream project build file changes, get the updated artifact paths
-                    boolean updatedArtifactPaths = updateArtifactPaths(project, true, generateFeatures, executor);
+                    boolean updatedArtifactPaths = updateArtifactPaths(project, true, executor);
                     if (updatedArtifactPaths) {
                         // recompile the entire module
                         if (!project.getSourceDirectory().exists() && !project.getTestSourceDirectory().exists()
@@ -4744,7 +4748,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             triggerUpstreamModuleCompile(getProjectModule(project.getDependentModules().get(0)),
                                     false, generateFeatures);
                         } else {
-                            warn ("triggerUpstreamModuleCompile2");
+                            warn ("triggerUpstreamModuleCompile2, project=" + project);
                             triggerUpstreamModuleCompile(project, false, generateFeatures);
                         }
                     }
@@ -5703,6 +5707,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (tests) {
                     if (projectName != null) {
                         info(projectName + " tests compilation was successful.");
+                        warn(projectName + " tests compilation was successful.");
                     } else {
                         info("Tests compilation was successful.");
                     }
@@ -5713,6 +5718,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     if (projectName != null) {
                         info(projectName + " source compilation was successful.");
+                        warn(projectName + " source compilation was successful.");
                     } else {
                         info("Source compilation was successful.");
                     }
