@@ -578,6 +578,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.generatedFeaturesCopied = false;
         if (this.generateFeatures) {
             this.generatedFeaturesSet = getGeneratedFeaturesOnStartup();
+            warn("generated features="+generatedFeaturesSet);
         } else {
             this.generatedFeaturesSet = new HashSet<String>();
         }
@@ -3219,8 +3220,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     long lastJavaSourceChange;
     long lastJavaTestChange;
     Map<File, Long> lastBuildFileChange;
-    boolean triggerJavaSourceRecompile; // TODO: analyze this variable
-    boolean triggerJavaTestRecompile; // TODO: analyze this variable
+    boolean triggerJavaSourceRecompile;
+    boolean triggerJavaTestRecompile;
     File outputDirectory;
     File testOutputDirectory;
     File serverXmlFile;
@@ -3235,7 +3236,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     boolean lastChangeCompiled; // tracks when the module containing the latest src file change is compiled successfully
 
     // used for multi module projects
-    boolean triggerUpstreamJavaSourceRecompile; // TODO: analyze this variable
+    boolean triggerUpstreamJavaSourceRecompile;
     boolean initialCompile;
     boolean disableDependencyCompile;
 
@@ -4619,10 +4620,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
-        // A child module inherits dependencies only if it specifies the <parent> element
-        // in its pom. If the current file appears in the list of build files which contain
-        // <parent> elements then we must propagate potential dependency changes and rebuild
-        if (this.parentBuildFiles.containsKey(fileChanged.getCanonicalPath())
+        // parent build file changed
+        if (!this.parentBuildFiles.isEmpty() && this.parentBuildFiles.containsKey(fileChanged.getCanonicalPath())
                 && changeType == ChangeType.MODIFY) {
             debug("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths.");
             updateArtifactPaths(fileChanged);
@@ -4633,19 +4632,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isMultiModuleProject()) {
                     ProjectModule project = getFirstProjectModule(fileChanged);
                     if (project != null) {
-                                warn ("triggerUpstreamModuleCompile3");
                         triggerUpstreamModuleCompile(project, false, generateFeatures);
                     } else {
-                                warn ("triggerMainModuleCompile1");
                         triggerMainModuleCompile(false, generateFeatures);
                     }
                 } else {
-                                warn ("triggerMainModuleCompile2");
                     triggerMainModuleCompile(false, generateFeatures);
                 }
             } else {
-                                warn ("triggerMainModuleCompile3");
-                triggerMainModuleCompile(false, generateFeatures);
+                // trigger recompile of failing source and test
+                compileFailingProjects(null, false, executor);
             }
         }
 
@@ -4736,16 +4732,28 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // when an upstream project build file changes, get the updated artifact paths
                     boolean updatedArtifactPaths = updateArtifactPaths(project, true, generateFeatures, executor);
                     if (updatedArtifactPaths) {
-                        // recompile the entire module
-                        if (!project.getSourceDirectory().exists() && !project.getTestSourceDirectory().exists()
-                                && !project.getDependentModules().isEmpty()) {
-                            warn ("triggerUpstreamModuleCompile1");
-                            // parent project, trigger compile on first dependent module
-                            triggerUpstreamModuleCompile(getProjectModule(project.getDependentModules().get(0)),
-                                    false, generateFeatures);
+                        if (recompileDependencies) {
+                            // recompile the entire module
+                            if (!project.getSourceDirectory().exists() && !project.getTestSourceDirectory().exists()
+                                    && !project.getDependentModules().isEmpty()) {
+                                // parent project, trigger compile on first dependent module
+                                triggerUpstreamModuleCompile(getProjectModule(project.getDependentModules().get(0)),
+                                        false, generateFeatures);
+                            } else {
+                                triggerUpstreamModuleCompile(project, false, generateFeatures);
+                            }
                         } else {
-                            warn ("triggerUpstreamModuleCompile2");
-                            triggerUpstreamModuleCompile(project, false, generateFeatures);
+                            // trigger java source recompile of all projects if there are compilation errors
+                            // in this project
+                            if (!project.failedCompilationJavaSources.isEmpty()) {
+                                triggerUpstreamJavaSourceRecompile = true;
+                                modifiedSrcBuildFile = project.getBuildFile();
+                            }
+                            // trigger java test recompile of just this project if there are existing test
+                            // compilation errors
+                            if (!project.failedCompilationJavaTests.isEmpty()) {
+                                project.triggerJavaTestRecompile = true;
+                            }
                         }
                     }
                 } else if (upstreamResourceParent != null
@@ -4888,7 +4896,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             
             // run all tests on build file change
             if (recompiledBuild) {
-                triggerMainModuleCompile(false, generateFeatures);
+                if (recompileDependencies) {
+                    triggerMainModuleCompile(false, generateFeatures);
+                } else {
+                    // trigger java source recompile if there are compilation errors
+                    if (!failedCompilationJavaSources.isEmpty()) {
+                        triggerJavaSourceRecompile = true;
+                        modifiedSrcBuildFile = buildFile;
+                    }
+                    // trigger java test recompile if there are compilation errors
+                    if (!failedCompilationJavaTests.isEmpty()) {
+                        triggerJavaTestRecompile = true;
+                    }
+                }
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(containerfileUsed)
@@ -6410,7 +6430,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return false;
     }
 
-    // returns the features specified in the generated-features.xml file
+    // returns the features specified in the generated-features.xml file either in src dir
+    // or in the generate features temp dir
     private Set<String> getGeneratedFeatures() {
         return getGeneratedFeatures(generateFeaturesFile);
     }
@@ -6419,6 +6440,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     // We must use the server dir. When generateToSrc is on we should have also copied the file to server dir.
     private Set<String> getGeneratedFeaturesOnStartup() {
         File generateFeaturesServerFile = new File(serverDirectory, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH);
+        warn("generateFeaturesServerFile="+generateFeaturesServerFile+
+          " exists()="+generateFeaturesServerFile.exists()+
+          " length="+generateFeaturesServerFile.length()+
+          " lastMod="+generateFeaturesServerFile.lastModified());
+        warn("generateFeaturesFile="+generateFeaturesFile+
+          " exists()="+generateFeaturesFile.exists()+
+          " length="+generateFeaturesFile.length()+
+          " lastMod="+generateFeaturesFile.lastModified());
+        warn(" ");
+        // Assert that when generateToSrc is on the features file was copied from src to server dir.
+        if (!generateFeaturesServerFile.exists() || generateFeaturesServerFile.length() <= 0) {
+            debug("Attempting to scan file for features but it is missing or empty:" + generateFeaturesServerFile.getAbsolutePath());
+            return new HashSet<String>(); 
+        }
         return getGeneratedFeatures(generateFeaturesServerFile);
     }
 
