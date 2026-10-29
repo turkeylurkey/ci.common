@@ -5678,7 +5678,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (tests) {
                     if (projectName != null) {
                         info(projectName + " tests compilation was successful.");
-                        warn(projectName + " tests compilation was successful.");
                     } else {
                         info("Tests compilation was successful.");
                     }
@@ -5689,7 +5688,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     if (projectName != null) {
                         info(projectName + " source compilation was successful.");
-                        warn(projectName + " source compilation was successful.");
                     } else {
                         info("Source compilation was successful.");
                     }
