@@ -74,12 +74,15 @@ public abstract class FeatureGeneratorUtil {
     public static final String GENERATED_FEATURES_TEMP_DIR = ".libertyFeatures";
     public static final String GENERATED_FEATURES_TEMP_PATH = GENERATED_FEATURES_TEMP_DIR + File.separator + GENERATED_FEATURES_FILE_PATH;
     public static final String FEATURE_GEN_LOG_LOCATION = "feature-gen";
-    public static final Set<String> LIBERTY_APP_FILE_TYPES = Set.of(
+    // Liberty apps that are supported by the feature-gen scanner
+    public static final Set<String> FEATURE_GEN_LIB_TYPES = Set.of(
             ".war", ".war.xml",
             ".ear", ".ear.xml",
-            ".eba",
-            ".esa",
-            ".spring");
+            ".eba");
+    // Liberty pom packaging file types that are not supported by the feature-gen scanner
+    public static final Set<String> FEATURE_GEN_UNSUP_TYPES = Set.of(
+            "esa",
+            "spring");
     private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
@@ -403,53 +406,53 @@ public abstract class FeatureGeneratorUtil {
     private Set<String> getBinaryInputs(List<String> classFiles, String[] deployedAppFilePaths, boolean optimize) throws IOErrorReadingXMLException {
         Set<String> resultSet = new HashSet<String>();
         if (optimize) {
-            // Use either the loose app config or a regular application deployment binary file (ear/war/jar)
             if (deployedAppFilePaths != null) {
+                // Use either the loose app config or a regular application deployment binary file (ear/war/jar)
                 for (String deployedAppFilePath : deployedAppFilePaths) {
-                    validateAppFilePath(deployedAppFilePath, resultSet);
+                    handleLooseAppDirs(deployedAppFilePath, resultSet);
                 }
             }
         } else {
             // incremental generate features passes only individual class files to the scanner
             if (classFiles != null && !classFiles.isEmpty()) {
-                resultSet = new HashSet<String>(classFiles);
+                resultSet.addAll(classFiles);
             }
         }
         return resultSet;
     }
 
-    // validate the path string of the application against the list of supported file extensions
-    // if valid add it to the result set but if it is a loose app add all the directories to the result set
-    private void validateAppFilePath(String applicationPath, Set<String> resultSet) throws IOErrorReadingXMLException {
-        boolean appValidated = false;
-        for (String appType : LIBERTY_APP_FILE_TYPES) {
-            if (applicationPath.endsWith(appType)) {
-                appValidated = true;
-                if (applicationPath.endsWith(".xml")) {
-                    try {
-                        // extract the file names from the xml file
-                        File looseAppFile = new File(applicationPath);
-                        if (looseAppFile.exists()) {
-                            Set<String> diskPaths = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
-                            if (diskPaths.isEmpty()) {
-                                error("This file cannot be analyzed for Liberty features because it is a loose application file that does not specify any application directories: " + applicationPath);
-                            } else {
-                                resultSet.addAll(diskPaths);
-                            }
-                        } else {
-                            debug("Error, specified application file does not exist:" + applicationPath);
-                        }
-                    } catch (IOException e) {
-                        throw new IOErrorReadingXMLException();
+    // if the app is a loose app add all its directories to the result set otherwise add the archive to the result set
+    private void handleLooseAppDirs(String applicationPath, Set<String> resultSet) throws IOErrorReadingXMLException {
+        if (applicationPath.endsWith(".xml")) {
+            try {
+                // extract the file names from the xml file
+                File looseAppFile = new File(applicationPath);
+                if (looseAppFile.exists()) {
+                    Set<String> diskPaths = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
+                    if (diskPaths.isEmpty()) {
+                        error("This file cannot be analyzed for Liberty features because it is a loose application archive that does not specify any application directories: " + applicationPath);
+                    } else {
+                        resultSet.addAll(diskPaths);
                     }
                 } else {
-                    resultSet.add(applicationPath);
+                    debug("Error, specified application file does not exist:" + applicationPath);
                 }
+            } catch (IOException e) {
+                throw new IOErrorReadingXMLException();
+            }
+        } else {
+            resultSet.add(applicationPath);
+        }
+    }
+
+    // validate the path string of the application against the list of supported file extensions
+    public static boolean validateLibertyApp(String applicationPath) {
+        for (String appType : FEATURE_GEN_LIB_TYPES) {
+            if (applicationPath.endsWith(appType)) {
+                return true;
             }
         }
-        if (!appValidated) {
-            info("This file cannot be analyzed for Liberty features because the file extension is not supported: " + applicationPath);
-        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")
