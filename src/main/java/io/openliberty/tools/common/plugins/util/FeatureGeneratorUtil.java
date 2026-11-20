@@ -409,7 +409,7 @@ public abstract class FeatureGeneratorUtil {
             if (deployedAppFilePaths != null) {
                 // Use either the loose app config or a regular application deployment binary file (ear/war/jar)
                 for (String deployedAppFilePath : deployedAppFilePaths) {
-                    handleLooseAppDirs(deployedAppFilePath, resultSet);
+                    handleDeployedAppFilePath(deployedAppFilePath, resultSet);
                 }
             }
         } else {
@@ -421,8 +421,9 @@ public abstract class FeatureGeneratorUtil {
         return resultSet;
     }
 
-    // if the app is a loose app add all its directories to the result set otherwise add the archive to the result set
-    private void handleLooseAppDirs(String applicationPath, Set<String> resultSet) throws IOErrorReadingXMLException {
+    // if the app is a loose app then add all its directories to the result set otherwise add the archive to the result set
+    // Note the applicationPath could also be a classes directory for certain project types.
+    private void handleDeployedAppFilePath(String applicationPath, Set<String> resultSet) throws IOErrorReadingXMLException {
         if (applicationPath.endsWith(".xml")) {
             try {
                 // extract the file names from the xml file
