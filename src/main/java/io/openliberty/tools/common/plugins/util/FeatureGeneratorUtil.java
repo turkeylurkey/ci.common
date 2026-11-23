@@ -78,6 +78,8 @@ public abstract class FeatureGeneratorUtil {
     public static final Set<String> FEATURE_GEN_LIB_TYPES = Set.of(
             ".war", ".war.xml",
             ".ear", ".ear.xml",
+            ".jar",
+            ".zip",
             ".eba");
     // Liberty pom packaging file types that are not supported by the feature-gen scanner
     public static final Set<String> FEATURE_GEN_UNSUP_TYPES = Set.of(
