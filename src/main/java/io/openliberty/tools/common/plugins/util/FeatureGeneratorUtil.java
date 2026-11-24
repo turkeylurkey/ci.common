@@ -83,8 +83,7 @@ public abstract class FeatureGeneratorUtil {
             ".eba");
     // Liberty pom packaging file types that are not supported by the feature-gen scanner
     public static final Set<String> FEATURE_GEN_UNSUP_TYPES = Set.of(
-            "esa",
-            "spring");
+            "esa");
     private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
